@@ -6,6 +6,8 @@ The final version runs independent steps in parallel, survives crashes, waits da
 
 Everything is real: a real model (Gemini, free tier) with real tool calls and structured output, a real HTTP platform (orders, refund policy, fraud scoring, payments with idempotency keys, approvals), real crashes, SQLite checkpoints and a test suite. Each stage ends with **where it breaks**, which is the reason for the next one. Read the commits in order and the history reads like the course.
 
+![The same $640 refund in three structures](viz/timelines.png)
+
 ## The idea in one paragraph
 
 An agent loop is a scheduler whose ready list always holds exactly one item, picked by a model call you can't inspect. A graph makes that structure explicit. **Nodes** do one job each (a function, one model call, a sub-agent or a person). **Edges** say what may run next (fixed, or conditional, and plain code whenever code can decide). **State** is a typed object, not a transcript. Run the graph in **supersteps** (Pregel, 2010) and you get safe parallelism. Save a **checkpoint** after every superstep and you get resume, human-in-the-loop pauses, time travel and an audit trail. Add **idempotency keys** to anything that touches money. The model is left with a handful of judgments, each small enough to verify.
@@ -64,6 +66,33 @@ Open **http://127.0.0.1:8700/ui** while any stage runs. Every run streams its ev
 - **Timeline:** one bar per node run. In stage 1 the lookups form a staircase; in stage 3 they're three bars side by side.
 - **State:** the typed fields, flashing as nodes write them. The loop has only a transcript.
 - **Log:** every node start, finish and failure, with times.
+
+![The live run viewer](viz/viewer.png)
+
+## Results
+
+Real runs on gemini-3.5-flash, 2026-10-16:
+
+| What we broke | Agent loop (stage 1) | Graph (stages 4 to 7) |
+|---|---|---|
+| The fraud service hangs once | Run lost; restart: 46.8 s, 6 model calls | Only the fraud node re-runs (LangGraph: `RetryPolicy`, the run never fails) |
+| The manager is out until Thursday | Blocks, then gives up | Pauses, the process exits, resumes in a new process after `ops approve` |
+| `kill -9` mid-run | Everything lost | Resumes from the last round |
+| Crash right after paying | (no recovery at all) | Without a key: paid twice ($36). Key = run + node: paid once |
+| A wrong decision (clause §7, double amount) | Paid as decided | Verifier rejects it; `decide` retries with feedback; $72 under §1 |
+
+And on 12 cases (late, missing, spoiled, fraud, cancellation, complaint, Arabic, prompt injection), scored on the money that actually moved:
+
+| Design | Correct | Model calls | Tokens in | Cost (list price) | Time |
+|---|---|---|---|---|---|
+| Agent loop | 12/12 | 39 | 32,892 | $0.0168 | 16.5 min |
+| Graph | 12/12 | 23 | 7,082 | $0.0059 | 9.7 min |
+
+Accuracy was a tie: a current model gets these steps right either way. The structure bought the rest: 78% fewer input tokens, a third of the cost, and a run that survives failures, people and replays.
+
+![Agent loop vs graph](viz/evaluation.png)
+
+Charts: [`viz/`](viz/), redrawn from real runs with `python viz/make_charts.py`.
 
 ## Where this comes from
 
