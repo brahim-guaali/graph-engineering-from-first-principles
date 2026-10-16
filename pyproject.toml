@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graph-engineering-from-first-principles"
+version = "0.1.0"
+description = "From a naive agent loop to graph engineering, one runnable stage at a time."
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "httpx>=0.27",
+    "google-genai>=1.30,<3",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+langgraph = ["langgraph>=1.0", "langgraph-checkpoint-sqlite>=2.0"]
+viz = ["matplotlib>=3.8"]
+
+[tool.setuptools]
+packages = ["agentkit", "services"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
