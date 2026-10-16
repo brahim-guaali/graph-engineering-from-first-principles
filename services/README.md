@@ -14,6 +14,7 @@ make platform          # http://127.0.0.1:8700/docs for the interactive API
 | `POST /approvals`, `POST /approvals/{id}/decision` | An operations manager approves or rejects | A person in the process |
 | `POST /payments` | Moves money; honours an `Idempotency-Key` header | Side effects that must not happen twice |
 | `POST /notifications` | Message to the customer | |
+| `POST /events`, `GET /events/stream`, `GET /ui` | Runs report what they're doing (`agentkit/trace.py`); the page at `/ui` streams it live | Seeing a run is how you understand it |
 | `POST /admin/faults` | `{"fraud": 1}`: the next fraud call hangs | Failure on demand for the demos |
 | `POST /admin/reset` | Clears payments, approvals, faults | |
 

@@ -11,6 +11,7 @@ Faults are injected over HTTP, so a demo can make the fraud service hang the nex
 it is called:  POST /admin/faults {"fraud": 1}
 """
 import asyncio
+import json
 import os
 import sqlite3
 import threading
@@ -20,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from services import data
@@ -193,4 +195,65 @@ def reset():
     _faults.clear()
     with _lock, db() as conn:
         conn.executescript("delete from payments; delete from approvals; delete from notifications;")
+    return {"ok": True}
+
+
+# --- live run viewer: runs post events here, the page at /ui streams them ------------------
+_runs: dict[str, dict] = {}
+_listeners: set[asyncio.Queue] = set()
+UI = Path(__file__).resolve().parent / "ui" / "index.html"
+
+
+@app.post("/events")
+async def post_events(events: list[dict]):
+    for e in events:
+        run = _runs.setdefault(e["run"], {"id": e["run"], "events": []})
+        if e["type"] == "run_started":
+            run.update(stage=e["stage"], title=e["title"], status="running", started=now())
+        elif e["type"] == "run_finished":
+            run["status"] = e["status"]
+        run["events"].append(e)
+        for q in list(_listeners):
+            q.put_nowait(e)
+    return {"ok": True}
+
+
+@app.get("/runs")
+def list_runs():
+    return [{k: v for k, v in r.items() if k != "events"} for r in reversed(_runs.values())]
+
+
+@app.get("/runs/{run_id}")
+def get_run(run_id: str):
+    if run_id not in _runs:
+        raise HTTPException(404, f"no run {run_id}")
+    return _runs[run_id]
+
+
+@app.get("/events/stream")
+async def stream_events():
+    async def gen():
+        q: asyncio.Queue = asyncio.Queue()
+        _listeners.add(q)
+        try:
+            yield ": connected\n\n"
+            while True:
+                try:
+                    e = await asyncio.wait_for(q.get(), timeout=15)
+                    yield f"data: {json.dumps(e, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            _listeners.discard(q)
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+@app.get("/ui", response_class=HTMLResponse)
+def ui():
+    return UI.read_text()
+
+
+@app.post("/admin/clear-runs")
+def clear_runs():
+    _runs.clear()
     return {"ok": True}

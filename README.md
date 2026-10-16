@@ -56,6 +56,15 @@ make platform                   # terminal 1: the food-delivery API on :8700
 make test                       # the tests need no key
 ```
 
+## Watch it live
+
+Open **http://127.0.0.1:8700/ui** while any stage runs. Every run streams its events to the platform, and the page shows them as they happen:
+
+- **Graph:** the nodes light up as they run (blue), finish (green), fail (red) or wait for a person (amber).
+- **Timeline:** one bar per node run. In stage 1 the lookups form a staircase; in stage 3 they're three bars side by side.
+- **State:** the typed fields, flashing as nodes write them. The loop has only a transcript.
+- **Log:** every node start, finish and failure, with times.
+
 ## Where this comes from
 
 None of this is new, which is the point: state machines, build tools (make, 1976), Pregel (Google, 2010), data-pipeline schedulers, durable workflow engines (Temporal) and payment-API idempotency keys. What's new is that some nodes are language models, which are slow, expensive and sometimes wrong, so the old discipline matters more.

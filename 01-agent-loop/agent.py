@@ -12,6 +12,7 @@ import uuid
 from google.genai import types
 
 from agentkit.platform import Platform
+from agentkit.trace import NullTracer
 
 SYSTEM = """You are the refunds agent of a food-delivery app.
 Handle the customer's message using the tools. Always look up the order, the refund policy
@@ -61,6 +62,7 @@ class Tools:
 
     def __init__(self, platform, run_id, approval_wait=20):
         self.platform, self.run_id, self.approval_wait = platform, run_id, approval_wait
+        self.tracer = NullTracer()
 
     def get_order(self, order_id):
         return self.platform.get_order(order_id)
@@ -74,6 +76,7 @@ class Tools:
     def request_manager_approval(self, order_id, amount, reason):
         # A loop can only wait for a person by blocking: poll, holding everything open.
         a = self.platform.request_approval(self.run_id, order_id, amount, reason)
+        self.tracer.node_waiting("request_manager_approval", f"approval {a['id']}: the loop blocks until someone answers")
         deadline = time.monotonic() + self.approval_wait
         while time.monotonic() < deadline:
             status = self.platform.get_approval(a["id"])["status"]
@@ -89,28 +92,54 @@ class Tools:
         return self.platform.notify(customer, text)
 
 
-def agent_loop(request, llm, platform=None, max_steps=20, approval_wait=20, log=print):
+KINDS = {"get_order": "http", "get_refund_policy": "http", "get_fraud_signals": "http",
+         "request_manager_approval": "person", "issue_refund": "http · money", "notify_customer": "http"}
+
+
+def graph_spec():
+    """For the live viewer: the loop is one model node with every tool hanging off it."""
+    nodes = [{"id": "model", "kind": "model"}]
+    nodes += [{"id": t, "kind": k, "label": t.replace("request_manager_", "")} for t, k in KINDS.items()]
+    edges = [{"from": "model", "to": t, "cond": True, "label": "model picks"} for t in KINDS]
+    return {"entry": "model", "nodes": nodes, "edges": edges}
+
+
+def agent_loop(request, llm, platform=None, max_steps=20, approval_wait=20, log=print, tracer=None):
     """The whole agent. Returns (final text, transcript, trace)."""
+    tracer = tracer or NullTracer()
     platform = platform or Platform()
     tools = Tools(platform, run_id="loop-" + uuid.uuid4().hex[:6], approval_wait=approval_wait)
+    tools.tracer = tracer
     contents = [types.Content(role="user", parts=[types.Part.from_text(
         text=f"Customer {request['customer']} wrote: {request['message']}")])]
     trace, t0 = [], time.monotonic()
 
     for step in range(1, max_steps + 1):
         before = llm.usage.input_tokens
+        tracer.node_started("model", round=step)
         response = llm.chat(SYSTEM, contents, TOOLS)
         read = llm.usage.input_tokens - before
+        tracer.node_finished("model")
+        tracer.usage(llm.usage)
+        tracer.state({"transcript": f"{len(contents) + 1} messages; this call re-read {read:,} tokens"})
         contents.append(response.candidates[0].content)
         calls = response.function_calls or []
-        log(f"  [{time.monotonic() - t0:5.1f}s] step {step:2d}: model read {read:5,d} tokens -> "
-            + (", ".join(f"{c.name}({_short(c.args)})" for c in calls) or "final answer"))
+        line = (f"step {step:2d}: model read {read:5,d} tokens -> "
+                + (", ".join(f"{c.name}({_short(c.args)})" for c in calls) or "final answer"))
+        log(f"  [{time.monotonic() - t0:5.1f}s] {line}")
+        tracer.log(line)
         if not calls:
             return response.text, contents, trace
 
         parts = []
         for call in calls:                       # one at a time, even when the model asks for several
-            result = getattr(tools, call.name)(**(call.args or {}))   # any exception ends the run
+            tracer.node_started(call.name, round=step)
+            try:
+                result = getattr(tools, call.name)(**(call.args or {}))   # any exception ends the run
+            except Exception as e:
+                tracer.node_failed(call.name, e)
+                raise
+            tracer.node_finished(call.name, {"result": result})
             trace.append((call.name, dict(call.args or {})))
             parts.append(types.Part.from_function_response(name=call.name, response={"result": result}))
         contents.append(types.Content(role="user", parts=parts))

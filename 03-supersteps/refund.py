@@ -3,6 +3,7 @@ import time
 import uuid
 
 from agentkit import judgments
+from agentkit.trace import NullTracer
 from engine import END, StateGraph, add, append
 
 APPROVAL_LIMIT = 500
@@ -20,7 +21,7 @@ class ManagerAway(Exception):
     pass
 
 
-def build(llm, platform, channels=CHANNELS, approval_wait=20):
+def build(llm, platform, channels=CHANNELS, approval_wait=20, tracer=NullTracer()):
     g = StateGraph(channels)
 
     def charged(call):
@@ -52,6 +53,7 @@ def build(llm, platform, channels=CHANNELS, approval_wait=20):
     def approval(s):
         a = platform.request_approval("ss-" + uuid.uuid4().hex[:6], s["order"]["order_id"],
                                       s["decision"].amount, s["decision"].reason)
+        tracer.node_waiting("approval", f"approval {a['id']} sent to the operations manager")
         deadline = time.monotonic() + approval_wait
         while time.monotonic() < deadline:
             status = platform.get_approval(a["id"])["status"]
@@ -72,15 +74,20 @@ def build(llm, platform, channels=CHANNELS, approval_wait=20):
     def handoff(s):
         return {"reply": {"queue": "customer-support", "text": s["request"]["message"]}}
 
+    kinds = {"classify": "model", "decide": "model", "order": "http", "policy": "http", "fraud": "http",
+             "approval": "person", "refund": "http · money", "reply": "http", "handoff": "code"}
     for fn in (classify, order, policy, fraud, decide, approval, refund, reply, handoff):
-        g.add_node(fn.__name__, fn)
+        g.add_node(fn.__name__, fn, kinds[fn.__name__])
 
     g.set_entry("classify")
     g.add_conditional_edges("classify", lambda s: ["order", "policy", "fraud"]       # fan-out
-                            if s["claim"].kind == "refund_request" else "handoff")
+                            if s["claim"].kind == "refund_request" else "handoff",
+                            {"order": "refund", "policy": "refund", "fraud": "refund", "handoff": "other"})
     g.add_edge(["order", "policy", "fraud"], "decide")                               # fan-in
-    g.add_conditional_edges("decide", route_after_decision)
-    g.add_conditional_edges("approval", lambda s: "refund" if s["approval"] == "approved" else "reply")
+    g.add_conditional_edges("decide", route_after_decision,
+                            {"approval": "> $500", "refund": "≤ $500", "reply": "credit / refuse"})
+    g.add_conditional_edges("approval", lambda s: "refund" if s["approval"] == "approved" else "reply",
+                            {"refund": "approved", "reply": "rejected"})
     g.add_edge("refund", "reply")
     g.add_edge("reply", END)
     g.add_edge("handoff", END)

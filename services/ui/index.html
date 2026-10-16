@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live runs</title>
+<style>
+:root {
+  --bg: #f4f4f2; --surface: #fcfcfb; --surface-2: #f0efec; --border: #e1e0db;
+  --text: #0b0b0b; --text-2: #52514e; --muted: #8a8984;
+  --running: #2a78d6; --good: #0ca30c; --warning: #fab219; --critical: #d03b3b; --idle: #c9c8c2;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #33332f;
+    --text: #ffffff; --text-2: #c3c2b7; --muted: #8f8e86; --running: #3987e5; --idle: #4a4945;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
+header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+header .conn { margin-left: auto; font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); display: inline-block; }
+.dot.on { background: var(--good); }
+.layout { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 49px); }
+aside { border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; max-height: calc(100vh - 49px); }
+aside .follow { padding: 10px 14px; font-size: 12px; color: var(--text-2); border-bottom: 1px solid var(--border); display: flex; gap: 6px; align-items: center; }
+.run { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.run:hover { background: var(--surface-2); }
+.run.sel { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--running); }
+.run .stage { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; }
+.run .title { font-weight: 500; }
+main { padding: 16px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; min-width: 0; }
+.card h2 { font-size: 12px; margin: 0 0 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.runhead { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: baseline; }
+.runhead .t { font-size: 18px; font-weight: 600; }
+.chip { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-2); }
+.chip b { font-weight: 600; color: var(--text); }
+.stat { font-size: 12px; color: var(--text-2); }
+.stat b { color: var(--text); font-variant-numeric: tabular-nums; }
+.summary { width: 100%; color: var(--text-2); font-size: 13px; }
+svg text { fill: var(--text); }
+.graph-wrap, .tl-wrap { overflow-x: auto; }
+.node rect { fill: var(--surface); stroke: var(--idle); stroke-width: 1.5; }
+.node .kind { fill: var(--muted); font-size: 10px; }
+.node .label { font-size: 13px; font-weight: 500; }
+.node .st { font-size: 10.5px; fill: var(--text-2); }
+.node.running rect { stroke: var(--running); stroke-width: 3; animation: pulse 1s ease-in-out infinite; }
+.node.done rect { stroke: var(--good); stroke-width: 2.5; }
+.node.failed rect { stroke: var(--critical); stroke-width: 3; }
+.node.waiting rect { stroke: var(--warning); stroke-width: 3; stroke-dasharray: 6 3; }
+@keyframes pulse { 50% { stroke-opacity: .35; } }
+.edge { fill: none; stroke: var(--idle); stroke-width: 1.5; }
+.edge.cond { stroke-dasharray: 5 4; }
+.edge.hot { stroke: var(--text-2); }
+.elabel { font-size: 10.5px; fill: var(--text-2) !important; }
+.tl-row text { font-size: 12px; }
+.tl-axis text { font-size: 10.5px; fill: var(--muted) !important; }
+.tl-axis line { stroke: var(--border); }
+.bar { rx: 4; }
+.bar.done { fill: var(--good); } .bar.failed { fill: var(--critical); }
+.bar.running { fill: var(--running); } .bar.waiting { fill: var(--warning); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.state { font: 12px/1.5 var(--mono); display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
+.state .k { color: var(--text-2); }
+.state .v { word-break: break-word; white-space: pre-wrap; transition: background 1.2s; border-radius: 4px; cursor: pointer;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.state .v.open { display: block; }
+.state .v.fresh { background: color-mix(in srgb, var(--running) 22%, transparent); }
+.log { font: 12px/1.55 var(--mono); max-height: 340px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+.log .ts { color: var(--muted); }
+.log .bad { color: var(--critical); } .log .ok { color: var(--good); } .log .wait { color: var(--text); background: color-mix(in srgb, var(--warning) 30%, transparent); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-top: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+#tip { position: fixed; pointer-events: none; background: var(--text); color: var(--surface); font-size: 12px; padding: 5px 8px; border-radius: 6px; opacity: 0; transition: opacity .1s; z-index: 10; }
+.empty { color: var(--text-2); padding: 40px; text-align: center; }
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  aside { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .two { grid-template-columns: 1fr; }
+  main { padding: 12px 16px; }
+}
+</style>
+</head>
+<body>
+<header><h1>Graph engineering · live runs</h1><span class="conn"><span class="dot" id="conn"></span><span id="connText">connecting</span></span></header>
+<div class="layout">
+  <aside>
+    <label class="follow"><input type="checkbox" id="follow" checked> Follow the newest run</label>
+    <div id="runs"></div>
+  </aside>
+  <main id="main"><div class="empty">Start any stage (for example <code>python 03-supersteps/run.py</code>) and it appears here.</div></main>
+</div>
+<div id="tip"></div>
+<script>
+const runs = new Map();          // id -> run model
+const expanded = new Set();      // state values the reader opened
+let selected = null;
+let live = false;          // only events that arrive live flash in the state panel
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const short = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+const fmt = t => t < 10 ? t.toFixed(1) + "s" : Math.round(t) + "s";
+const ICON = {running: "●", done: "✓", failed: "✕", waiting: "⏸", idle: "○"};
+
+function model(id) {
+  if (!runs.has(id)) runs.set(id, {id, stage: "", title: id, status: "running", graph: {nodes: [], edges: []},
+    spans: {}, state: {}, fresh: {}, logs: [], usage: null, last: 0, summary: "", localStart: Date.now()});
+  return runs.get(id);
+}
+
+function apply(e) {
+  const r = model(e.run);
+  r.last = Math.max(r.last, e.t);
+  const open = n => (r.spans[n] || []).find(s => s.end == null);
+  switch (e.type) {
+    case "run_started":
+      Object.assign(r, {stage: e.stage, title: e.title, graph: e.graph, status: "running", localStart: Date.now() - e.t * 1000});
+      r.logs.push([e.t, `run started: ${e.stage} · ${e.title}`, ""]);
+      if ($("#follow").checked) selected = r.id;
+      break;
+    case "node_started": {
+      (r.spans[e.node] ||= []).push({start: e.t, end: null, status: "running", round: e.round});
+      r.logs.push([e.t, `▶ ${e.node}${e.round ? "  (round " + e.round + ")" : ""}`, ""]);
+      break; }
+    case "node_finished": {
+      const s = open(e.node); if (s) { s.end = e.t; s.status = "done"; }
+      const keys = Object.keys(e.writes || {});
+      for (const k of keys) { r.state[k] = e.writes[k]; if (live) r.fresh[k] = Date.now(); }
+      r.logs.push([e.t, `✓ ${e.node}${s ? " " + fmt(e.t - s.start) : ""}${keys.length ? "  wrote " + keys.join(", ") : ""}`, "ok"]);
+      break; }
+    case "node_failed": {
+      const s = open(e.node) || ((r.spans[e.node] ||= []).push({start: e.t, end: e.t}), r.spans[e.node].at(-1));
+      s.end = e.t; s.status = "failed"; s.error = e.error;
+      r.logs.push([e.t, `✕ ${e.node}: ${e.error}`, "bad"]);
+      break; }
+    case "node_waiting": {
+      const s = open(e.node); if (s) s.status = "waiting";
+      r.logs.push([e.t, `⏸ ${e.node}: ${e.why}`, "wait"]);
+      break; }
+    case "state":
+      for (const [k, v] of Object.entries(e.state)) {
+        if (live && JSON.stringify(r.state[k]) !== JSON.stringify(v)) r.fresh[k] = Date.now();
+        r.state[k] = v;
+      }
+      break;
+    case "usage": r.usage = e.usage; break;
+    case "log": r.logs.push([e.t, e.text, ""]); break;
+    case "run_finished":
+      r.status = e.status; r.summary = e.summary || "";
+      for (const spans of Object.values(r.spans)) for (const s of spans) if (s.end == null) { s.end = e.t; if (s.status === "running") s.status = e.status === "failed" ? "failed" : "done"; }
+      r.logs.push([e.t, `run ${e.status}${e.summary ? ": " + e.summary : ""}`, e.status === "failed" ? "bad" : e.status === "paused" ? "wait" : "ok"]);
+      break;
+  }
+}
+
+function nodeStatus(r, n) {
+  const s = (r.spans[n] || []).at(-1);
+  return s ? s.status : "idle";
+}
+function now(r) { return r.status === "running" ? (Date.now() - r.localStart) / 1000 : r.last; }
+
+// ---------- graph layout: longest path from the entry, back edges drawn underneath ----------
+function layout(g) {
+  const ids = g.nodes.map(n => n.id), out = {}, back = new Set();
+  ids.forEach(i => out[i] = []);
+  g.edges.forEach((e, i) => out[e.from] && out[e.from].push([e.to, i]));
+  const entry = g.entry || ids.find(i => !g.edges.some(e => e.to === i)) || ids[0];
+  const state = {};
+  (function dfs(u) {
+    state[u] = 1;
+    for (const [v, i] of out[u] || []) {
+      if (state[v] === 1) back.add(i); else if (!state[v]) dfs(v);
+    }
+    state[u] = 2;
+  })(entry);
+  const rank = {}; ids.forEach(i => rank[i] = 0);
+  for (let pass = 0; pass < ids.length; pass++)
+    g.edges.forEach((e, i) => { if (!back.has(i) && rank[e.to] < rank[e.from] + 1) rank[e.to] = rank[e.from] + 1; });
+  const cols = {};
+  ids.forEach(i => (cols[rank[i]] ||= []).push(i));
+  const W = 132, H = 46, GX = 70, GY = 26, pos = {};
+  const maxRows = Math.max(...Object.values(cols).map(c => c.length));
+  for (const [c, list] of Object.entries(cols)) {
+    const top = (maxRows - list.length) * (H + GY) / 2;
+    list.forEach((id, k) => pos[id] = {x: 16 + c * (W + GX), y: 16 + top + k * (H + GY)});
+  }
+  const width = 16 * 2 + (Object.keys(cols).length) * (W + GX) - GX;
+  const height = 16 * 2 + maxRows * (H + GY) - GY + 40;
+  return {pos, back, W, H, width, height};
+}
+
+function drawGraph(r) {
+  const g = r.graph;
+  if (!g.nodes.length) return "<div class='stat'>This run has no graph.</div>";
+  const L = layout(g), kinds = Object.fromEntries(g.nodes.map(n => [n.id, n]));
+  let edges = "", labels = "";
+  const labelled = new Set();
+  g.edges.forEach((e, i) => {
+    const a = L.pos[e.from], b = L.pos[e.to]; if (!a || !b) return;
+    const hot = nodeStatus(r, e.from) !== "idle" && nodeStatus(r, e.to) !== "idle";
+    let d, mx, my;
+    if (L.back.has(i)) {
+      const y = Math.max(a.y, b.y) + L.H + 26;
+      d = `M${a.x + L.W / 2},${a.y + L.H} C${a.x + L.W / 2},${y} ${b.x + L.W / 2},${y} ${b.x + L.W / 2},${b.y + L.H}`;
+      mx = (a.x + b.x + L.W) / 2; my = y - 4;
+    } else {
+      const x1 = a.x + L.W, y1 = a.y + L.H / 2, x2 = b.x, y2 = b.y + L.H / 2, cx = (x1 + x2) / 2;
+      d = `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2 - 4},${y2}`;
+      mx = cx; my = (y1 + y2) / 2 - 5;
+    }
+    edges += `<path class="edge ${e.cond ? "cond" : ""} ${hot ? "hot" : ""}" d="${d}" marker-end="url(#arr)"/>`;
+    const key = e.from + "|" + e.label;
+    if (e.label && !labelled.has(key) && labelled.add(key)) labels += `<text class="elabel" x="${mx}" y="${my}" text-anchor="middle">${esc(e.label)}</text>`;
+  });
+  let nodes = "";
+  for (const n of g.nodes) {
+    const p = L.pos[n.id], st = nodeStatus(r, n.id), spans = r.spans[n.id] || [], last = spans.at(-1);
+    let sub = st === "idle" ? "" : `${ICON[st]} ${st}`;
+    if (last && last.end != null && st === "done") sub += " " + fmt(last.end - last.start);
+    if (spans.length > 1) sub += ` ×${spans.length}`;
+    nodes += `<g class="node ${st}" data-node="${esc(n.id)}"><rect x="${p.x}" y="${p.y}" width="${L.W}" height="${L.H}" rx="8"/>
+      <text class="kind" x="${p.x + 10}" y="${p.y + 14}">${esc(n.kind || "")}</text>
+      <text class="label" x="${p.x + 10}" y="${p.y + 31}">${esc(short(n.label || n.id, 15))}</text>
+      <text class="st" x="${p.x + L.W - 8}" y="${p.y + 14}" text-anchor="end">${esc(sub)}</text></g>`;
+  }
+  return `<div class="graph-wrap"><svg viewBox="0 0 ${L.width} ${L.height}" style="width:100%;min-width:${Math.round(L.width * 0.72)}px;max-width:${L.width}px;height:auto" role="img" aria-label="graph of this run">
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-2)"/></marker></defs>
+    ${edges}${labels}${nodes}</svg></div>
+    <div class="legend"><span style="--c:var(--running)">● running</span><span style="--c:var(--good)">✓ done</span><span style="--c:var(--warning)">⏸ waiting for a person</span><span style="--c:var(--critical)">✕ failed</span><span style="--c:var(--idle)">○ not run</span></div>`;
+}
+
+// ---------- timeline: one row per node, one bar per time it ran ----------
+function drawTimeline(r) {
+  const order = r.graph.nodes.map(n => n.id).filter(id => r.spans[id]);
+  for (const id of Object.keys(r.spans)) if (!order.includes(id)) order.push(id);
+  if (!order.length) return "<div class='stat'>Nothing has run yet.</div>";
+  const end = Math.max(now(r), 1), labelW = 150, width = Math.max(560, ($("#main").clientWidth || 800) - 64);
+  const plotW = width - labelW - 10, rowH = 26, height = order.length * rowH + 26;
+  const x = t => labelW + (t / end) * plotW;
+  const step = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300].find(s => end / s <= 8) || 600;
+  let axis = "";
+  for (let t = 0; t <= end + 1e-9; t += step)
+    axis += `<line x1="${x(t)}" x2="${x(t)}" y1="0" y2="${height - 18}"/><text x="${x(t)}" y="${height - 4}" text-anchor="middle">${fmt(t)}</text>`;
+  let rows = "";
+  order.forEach((id, k) => {
+    const y = k * rowH;
+    const name = (r.graph.nodes.find(n => n.id === id) || {}).label || id;
+    rows += `<g class="tl-row"><text x="${labelW - 8}" y="${y + 17}" text-anchor="end">${esc(short(name, 20))}</text>`;
+    for (const s of r.spans[id]) {
+      const e = s.end == null ? now(r) : s.end, w = Math.max(3, x(e) - x(s.start));
+      const tip = `${id}: ${s.status}, ${fmt(e - s.start)} (from ${fmt(s.start)})${s.error ? " · " + s.error : ""}`;
+      rows += `<rect class="bar ${s.status}" x="${x(s.start)}" y="${y + 6}" width="${w}" height="${rowH - 10}" data-tip="${esc(tip)}"/>`;
+    }
+    rows += "</g>";
+  });
+  return `<div class="tl-wrap"><svg width="${width}" height="${height}" role="img" aria-label="timeline"><g class="tl-axis">${axis}</g>${rows}</svg></div>
+    <div class="stat" style="margin-top:6px">Bars that overlap ran at the same time. Hover a bar for its duration.</div>`;
+}
+
+function drawState(r) {
+  const keys = Object.keys(r.state);
+  if (!keys.length) return "<div class='stat'>No state yet.</div>";
+  return `<div class="state">${keys.map(k => {
+    const v = r.state[k];
+    const text = typeof v === "number" ? String(+v.toPrecision(4)) : typeof v === "string" ? v : JSON.stringify(v);
+    const fresh = Date.now() - (r.fresh[k] || 0) < 1500 ? "fresh" : "";
+    const open = expanded.has(r.id + k) ? "open" : "";
+    return `<div class="k">${esc(k)}</div><div class="v ${fresh} ${open}" data-key="${esc(k)}" title="click to expand">${esc(text)}</div>`;
+  }).join("")}</div>`;
+}
+
+function drawLog(r) {
+  return r.logs.map(([t, text, cls]) => `<div class="${cls}"><span class="ts">${fmt(t).padStart(6)}</span>  ${esc(text)}</div>`).join("");
+}
+
+function render() {
+  const list = [...runs.values()].reverse().map(r =>
+    `<div class="run ${r.id === selected ? "sel" : ""}" data-id="${r.id}"><div class="stage">${esc(r.stage)}</div>
+     <div class="title">${esc(r.title)}</div><div class="stat">${ICON[r.status] || "●"} ${esc(r.status)} · ${fmt(now(r))}</div></div>`).join("");
+  if ($("#runs").innerHTML !== list) $("#runs").innerHTML = list;
+  const r = runs.get(selected);
+  if (!r) return;
+  const logEl = $("#log"), atBottom = !logEl || logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 20;
+  const u = r.usage;
+  $("#main").innerHTML = `
+    <div class="card"><div class="runhead"><span class="t">${esc(r.title)}</span><span class="chip">${esc(r.stage)}</span>
+      <span class="chip"><b>${ICON[r.status] || ""} ${esc(r.status)}</b></span><span class="stat">elapsed <b>${fmt(now(r))}</b></span>
+      ${u ? `<span class="stat">model calls <b>${u.calls}</b></span><span class="stat">tokens in <b>${u.input_tokens.toLocaleString()}</b></span><span class="stat">out <b>${u.output_tokens.toLocaleString()}</b></span><span class="stat">cost <b>$${u.cost.toFixed(4)}</b></span>` : ""}
+      ${r.summary ? `<div class="summary">${esc(r.summary)}</div>` : ""}</div></div>
+    <div class="card"><h2>Graph</h2>${drawGraph(r)}</div>
+    <div class="card"><h2>Timeline</h2>${drawTimeline(r)}</div>
+    <div class="two"><div class="card"><h2>State</h2>${drawState(r)}</div>
+      <div class="card"><h2>Log</h2><div class="log" id="log">${drawLog(r)}</div></div></div>`;
+  const nl = $("#log"); if (atBottom) nl.scrollTop = nl.scrollHeight; else if (logEl) nl.scrollTop = logEl.scrollTop;
+}
+
+let dirty = true;
+setInterval(() => {
+  const r = runs.get(selected);
+  if (dirty || (r && r.status === "running")) { render(); dirty = false; }
+}, 250);
+
+$("#main").addEventListener("click", e => {
+  const v = e.target.closest(".state .v"); if (!v) return;
+  const key = selected + v.dataset.key;
+  expanded.has(key) ? expanded.delete(key) : expanded.add(key); dirty = true;
+});
+$("#runs").addEventListener("pointerdown", e => {
+  const el = e.target.closest(".run"); if (!el) return;
+  selected = el.dataset.id; $("#follow").checked = false; dirty = true;
+});
+document.addEventListener("mousemove", e => {
+  const tip = $("#tip"), t = e.target.closest("[data-tip]");
+  if (!t) { tip.style.opacity = 0; return; }
+  tip.textContent = t.dataset.tip; tip.style.opacity = 1;
+  tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (e.clientY + 14) + "px";
+});
+
+async function boot() {
+  const list = await (await fetch("/runs")).json();
+  for (const meta of list.slice(0, 30).reverse()) {
+    const full = await (await fetch("/runs/" + meta.id)).json();
+    for (const e of full.events) apply(e);
+  }
+  selected = list[0] && list[0].id;
+  dirty = true;
+  live = true;
+  const es = new EventSource("/events/stream");
+  es.onopen = () => { $("#conn").classList.add("on"); $("#connText").textContent = "live"; };
+  es.onerror = () => { $("#conn").classList.remove("on"); $("#connText").textContent = "reconnecting"; };
+  es.onmessage = m => { apply(JSON.parse(m.data)); dirty = true; };
+}
+boot();
+</script>
+</body>
+</html>

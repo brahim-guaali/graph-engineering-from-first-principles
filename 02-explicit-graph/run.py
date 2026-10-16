@@ -13,16 +13,29 @@ from agentkit.cases import CASES, REFUND
 from agentkit.llm import Gemini
 from agentkit.ops import ManagerAtDesk
 from agentkit.platform import Platform
+from agentkit.trace import Tracer
 from refund import build
+
+STAGE = "2 · explicit graph"
+
+
+def traced(title, llm, platform):
+    """Build the graph and a tracer that streams the run to http://127.0.0.1:8700/ui."""
+    tracer = Tracer(STAGE, title, usage=llm.usage)
+    graph = build(llm, platform, tracer=tracer)
+    tracer.start(graph.spec())
+    return graph, tracer
 
 
 def happy(platform):
     print("\n=== 1. Happy path: $640 late catering order ===")
     llm = Gemini()
     t0 = time.monotonic()
+    graph, tracer = traced("Happy path: $640 late catering", llm, platform)
     with ManagerAtDesk(delay=3):
-        state, path = build(llm, platform).run({"request": REFUND}, "classify")
+        state, path = graph.run({"request": REFUND}, "classify", tracer=tracer)
     d = state["decision"]
+    tracer.finished("done", f"{d.action} ${d.amount:.0f} under {d.clause}")
     print(f"  -> path: {' > '.join(path)}")
     print(f"  -> {d.action} ${d.amount:.0f} under {d.clause}: {d.reason}")
     print(f"  -> {time.monotonic() - t0:.1f}s, {llm.usage}")
@@ -33,18 +46,21 @@ def happy(platform):
 def complaint(platform):
     print("\n=== 2. A complaint takes another branch ===")
     rude = next(c for c in CASES if c["id"] == "rude-rider")
-    _, path = build(Gemini(), platform).run({"request": rude}, "classify")
+    graph, tracer = traced("A complaint about a rider", Gemini(), platform)
+    _, path = graph.run({"request": rude}, "classify", tracer=tracer)
+    tracer.finished("done", "handed to customer support")
     print(f"  -> path: {' > '.join(path)}")
 
 
 def ownership(platform):
     print("\n=== 3. A buggy node writes a field it doesn't own ===")
-    g = build(Gemini(), platform)
+    g, tracer = traced("A buggy node writes a field it doesn't own", Gemini(), platform)
     _, reads, writes = g.nodes["fraud"]
     g.nodes["fraud"] = (lambda s: {"fraud": {"score": 0.1}, "decision": "refund it"}, reads, writes)
     try:
-        g.run({"request": REFUND}, "classify", log=lambda *_: None)
+        g.run({"request": REFUND}, "classify", log=lambda *_: None, tracer=tracer)
     except PermissionError as e:
+        tracer.finished("failed", str(e))
         print(f"  !! {e}")
         print("  Ownership turns a silent bug (the fraud check deciding the refund) into a loud one.")
 
@@ -53,9 +69,11 @@ def timeout(platform):
     print("\n=== 4. The fraud service hangs ===")
     platform.inject_faults(fraud=1)
     t0 = time.monotonic()
+    graph, tracer = traced("The fraud service hangs", Gemini(), platform)
     try:
-        build(Gemini(), platform).run({"request": REFUND}, "classify")
+        graph.run({"request": REFUND}, "classify", tracer=tracer)
     except httpx.TimeoutException:
+        tracer.finished("failed", "fraud timed out: the state lived in memory, the run is lost")
         print(f"  !! the fraud node timed out at {time.monotonic() - t0:.1f}s. We know exactly which node")
         print("  failed and what the state held, but the state lived in this process. It's gone.")
 
