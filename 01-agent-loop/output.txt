@@ -1,0 +1,38 @@
+$ python 01-agent-loop/run.py
+
+=== 1. Happy path: the manager is at their desk ===
+  [ 19.2s] step  1: model read   528 tokens -> get_order(order_id='A-7731'), get_refund_policy(), get_fraud_signals(customer='C-1042')
+  [ 45.5s] step  2: model read   918 tokens -> request_manager_approval(amount=640, order_id='A-7731', reason='Order was delivered 70 minutes l)
+  [ 69.3s] step  3: model read 1,036 tokens -> issue_refund(order_id='A-7731', amount=640), notify_customer(text='Hello! We sincerely apologize for , customer='C-1042')
+  [ 94.0s] step  4: model read 1,282 tokens -> final answer
+
+  -> I have successfully processed your refund. 
+
+Because order A-7731 was delivered 70 minutes late, it qualified for a full refund under **Clause §1** of our refund policy (orders delivered more than 45 minutes late). Additionally, since the refund total was $640, it required operations manager approva
+  -> 94.1s, 4 model calls, 3,764 tokens in, 410 out, ~$0.0022
+  -> money moved: 640.0
+
+  Its state is a 4,517-character transcript of 8 messages.
+  'What was the fraud score when it decided?' means searching that transcript.
+
+=== 2. The fraud service hangs once ===
+  [ 20.8s] step  1: model read   528 tokens -> get_order(order_id='A-7731'), get_refund_policy(), get_fraud_signals(customer='C-1042')
+  !! the fraud call timed out. The run is gone after 29.8s and 1 model calls.
+  The order and policy it already fetched only lived in that run's transcript.
+  There is no saved position, so the only option is to start over:
+  -> total 133.1s and 5 model calls, 4,309 tokens in, 474 out, ~$0.0025 for one refund.
+
+=== 3. The manager is out until Thursday ===
+  [ 21.9s] step  1: model read   528 tokens -> get_order(order_id='A-7731'), get_refund_policy(), get_fraud_signals(customer='C-1042')
+  [ 48.0s] step  2: model read   918 tokens -> request_manager_approval(reason='Order was delivered 70 minutes l, amount=640, order_id='A-7731')
+  !! no decision on apr_920b3e85 after 15s.
+  The loop can only wait for a person by blocking. It holds the process, the
+  connection and the whole context open until Thursday, or it gives up. We gave up.
+  Approval still pending on the platform: 1
+
+Where the loop breaks. It isn't the model, it's the structure:
+  1) serial: the tool calls run one after another, even the independent ones
+  2) all-or-nothing: one timeout throws away every finished step
+  3) no pause: a person in the process means blocking for days or giving up
+  4) state is a transcript: every call re-reads all of it, and nothing has a name
+Next: 02-explicit-graph writes the structure down.

@@ -31,6 +31,18 @@ make platform                                  # terminal 1
 
 One thing a modern model does better than the textbook loop: Gemini asked for all three lookups **in a single turn**. Our loop still ran them one after another (6 s instead of 2 s). You could thread them, but then you're building a scheduler inside the loop, which is where the next stages go anyway.
 
+## Recorded run
+
+![The agent loop replayed](loop.gif)
+
+*Replay of real run `0b9e7fa2`: 61 frames sampled evenly over its 94 s (about 9× speed), captured by Playwright from `/ui?replay=0b9e7fa2` and assembled with ffmpeg by [`viz/make_gif.sh`](../viz/make_gif.sh). An MP4 of the same frames sits next to it.*
+
+![Terminal output of stage 1](terminal.png)
+
+*Terminal output of `python 01-agent-loop/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped.*
+
+On this run the loop read 528, 918, 1,036 and 1,282 tokens across its four calls (3,764 in total), and the hung fraud call made one refund take 133 s and 5 model calls. Free-tier latency changes from run to run (3 to 30 s per model call), so the times here differ from the table above. Compare model calls, tokens and rounds, not seconds.
+
 ## Where it breaks
 
 A loop is a scheduler whose ready list always has one item, picked by a model call you can't inspect. That explains every failure above:

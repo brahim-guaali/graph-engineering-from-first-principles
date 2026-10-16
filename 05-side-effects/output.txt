@@ -1,0 +1,47 @@
+$ python 05-side-effects/run.py
+
+=== 1. No idempotency key: crash after paying, resume pays again ===
+  thread t-1cd649, idempotency key OFF (pid 49097)
+  round 1 [  0.0s ->  19.8s] classify                 checkpoint 1 saved
+  round 2 [ 19.8s ->  21.9s] fraud + order + policy   checkpoint 2 saved
+  round 3 [ 21.9s ->  42.3s] decide                   checkpoint 3 saved
+  💥 crashing right after payment pay_65243a5c, before the checkpoint
+  The process died. Last checkpoint: 3, next ['refund'].
+  resuming t-1cd649 from checkpoint 3, next ['refund'] (pid 49184)
+  round 4 [  0.0s ->   0.0s] refund                   checkpoint 4 saved
+  round 5 [  0.0s ->   0.0s] reply                    checkpoint 5 saved
+  ✓ done: refund $18 under §2
+  Payments for A-8120: 2, total $36   <- the customer was paid twice
+    pay_65243a5c  $18  key=None
+    pay_8111783f  $18  key=None
+
+=== 2. With an idempotency key (run id + node): the replay is harmless ===
+  thread t-fef921, idempotency key on (pid 49185)
+  round 1 [  0.0s ->  18.6s] classify                 checkpoint 1 saved
+  round 2 [ 18.6s ->  20.6s] fraud + order + policy   checkpoint 2 saved
+  round 3 [ 20.6s ->  42.2s] decide                   checkpoint 3 saved
+  💥 crashing right after payment pay_304363a4, before the checkpoint
+  The process died. Last checkpoint: 3, next ['refund'].
+  resuming t-fef921 from checkpoint 3, next ['refund'] (pid 49267)
+  round 4 [  0.0s ->   0.0s] refund                   checkpoint 4 saved
+  round 5 [  0.0s ->   0.0s] reply                    checkpoint 5 saved
+  ✓ done: refund $18 under §2
+  Payments for A-8120: 1, total $18   <- once, as it should be
+    pay_304363a4  $18  key=t-fef921:refund
+
+=== 3. A budget in the state: an edge stops the run when the model has spent too much ===
+  thread t-d1d353, idempotency key on (pid 49268)
+  round 1 [  0.0s ->  20.1s] classify                 checkpoint 1 saved
+  round 2 [ 20.1s ->  22.1s] fraud + order + policy   checkpoint 2 saved
+  round 3 [ 22.1s ->  41.5s] decide                   checkpoint 3 saved
+  round 4 [ 41.5s ->  41.5s] over_budget              checkpoint 4 saved
+  ✓ done: escalated: model spend $0.00052 > budget $0.00020
+  The run never reached the payment: the router saw spent > budget and escalated to a person.
+
+What this stage fixed:
+  - a node that touches the outside world can run twice and act once (idempotency key = run + node)
+  - spending is a field in the state, so an ordinary edge can stop the run at a limit
+Where it still breaks:
+  1) the model's judgments are still unchecked: a wrong clause or amount goes straight to payment
+  2) we still haven't measured whether the graph is actually more reliable than the loop
+Next: 06-reliability adds a verifier with retries and evaluates both designs on 12 cases.

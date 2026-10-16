@@ -44,6 +44,20 @@ Real run, gemini-3.5-flash, 2026-10-16 ([full table](results/eval-2026-10-16.md)
 
 Where the gap would open: longer runs (the arithmetic above), more ambiguous cases, a smaller or cheaper model, and anything that crashes or waits.
 
+## Recorded run
+
+![The verifier retry replayed](verifier.gif)
+
+*Replay of real run `t-da536a`: 61 frames sampled evenly over its 65 s (about 7× speed), captured by Playwright from `/ui?replay=t-da536a` and assembled with ffmpeg by [`viz/make_gif.sh`](../viz/make_gif.sh). An MP4 of the same frames sits next to it. Watch `decide → verify → decide`: the first answer is spoiled on purpose, the verifier rejects it, and the second attempt passes.*
+
+![Terminal output of stage 6](terminal.png)
+
+*Terminal output of `python 06-reliability/arithmetic.py && python 06-reliability/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped.*
+
+![Same 12 questions, both designs](../viz/per-case.png)
+
+*Model calls and input tokens per case for the loop and the graph, drawn by [`viz/make_charts.py`](../viz/make_charts.py) from [`results/eval-2026-10-16.json`](results/eval-2026-10-16.json), the evaluation run on gemini-3.5-flash. ✓✓ means both designs produced the right outcome on the platform.*
+
 ## Where it breaks
 
 It's our own engine. **Next:** [stage 7](../07-langgraph/) builds the same graph on LangGraph, puts a loop inside one node, and asks when you shouldn't use a graph at all.

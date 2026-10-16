@@ -37,6 +37,16 @@ The case is a missing-dessert refund of $18. The process **really dies** (`os._e
 | **Key = run + node** | `pay_358e3448 $18 key=t-605b79:refund`: **once**. The replay got the original payment back |
 | **Budget $0.0002** | `decide` spent $0.0005, so the edge routed to `over_budget`. Escalated to a person; no money moved |
 
+## Recorded run
+
+![Terminal output of stage 5](terminal.png)
+
+*Terminal output of `python 05-side-effects/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped. The `*` lines are the process killing itself with `os._exit(137)` right after the payment API answered.*
+
+![The resumed run with an idempotency key](graph.png)
+
+*The live viewer replaying traced run `t-fef921` at its last event: green nodes ran, green edges are the path the run took (worked out from the round numbers in its events). Screenshot by Playwright of `/ui?replay=t-fef921`; the events are in [`viz/data/run-t-fef921.json`](../viz/data/run-t-fef921.json).*
+
 ## Where it breaks
 
 1. **The model's judgments are still unchecked.** If `decide` cites a clause that doesn't exist or refunds more than the policy allows, the graph pays it faithfully.

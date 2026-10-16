@@ -1,0 +1,43 @@
+$ python 06-reliability/arithmetic.py
+1. Reliability decays exponentially with the number of uncertain decisions in a row:
+     1 decisions at 99% each ->  99.0% of runs get through
+     4 decisions at 99% each ->  96.1% of runs get through
+    10 decisions at 99% each ->  90.4% of runs get through
+    30 decisions at 99% each ->  74.0% of runs get through
+    60 decisions at 99% each ->  54.7% of runs get through
+   100 decisions at 99% each ->  36.6% of runs get through
+
+2. A graph lowers the number of uncertain decisions. In our refund the step order, the
+   $500 rule, the wait for approval and the payment are code. What's left for the model:
+   loop:  ~7 choices (every tool call and the stop)  -> 93.2%
+   graph:  2 judgments (classify, decide)            -> 98.0%
+
+3. A narrow node with a sound check can retry. A judgment that is right 90% of the time:
+   1 attempt  -> 90.0%  (fails 10.000% of the time)
+   2 attempts -> 99.0%  (fails 1.000% of the time)
+   3 attempts -> 99.9%  (fails 0.100% of the time)
+
+4. And a narrow node reads less: our graph's decide reads ~550 tokens; the loop's last
+   call read ~1,750. Model accuracy tends to drop as the input gets longer.
+
+$ python 06-reliability/run.py
+
+=== The verifier catches a wrong decision; decide retries with the problems as feedback ===
+  round 1 [  0.0s ->  18.7s] classify                 checkpoint 1 saved
+  round 2 [ 18.7s ->  20.7s] fraud + order + policy   checkpoint 2 saved
+  (the first answer is spoiled on purpose: §1 -> §7, $72 -> $144)
+  round 3 [ 20.7s ->  43.0s] decide                   checkpoint 3 saved
+  round 4 [ 43.0s ->  43.0s] verify                   checkpoint 4 saved
+  round 5 [ 43.0s ->  65.3s] decide                   checkpoint 5 saved
+  round 6 [ 65.3s ->  65.3s] verify                   checkpoint 6 saved
+  round 7 [ 65.3s ->  65.3s] refund                   checkpoint 7 saved
+  round 8 [ 65.3s ->  65.3s] reply                    checkpoint 8 saved
+  checkpoint 4: verify found ["clause §7 does not exist; valid clauses are ['§1', '§2', '§3', '§4', '§5', '§6']", 'amount $144.0 is outside $0 to the order total $72']
+  -> refund $72 under §1 after 2 attempts; paid $72 once
+
+What this stage adds:
+  - a sound check after the one judgment that moves money, and a retry with the reasons
+  - the evaluation: both designs on 12 cases, scored on what actually happened (money, approvals)
+Where it still breaks:
+  - it's our own engine. Next: 07-langgraph builds the same graph on a real framework,
+    with a loop inside one node, and asks when you shouldn't use a graph at all.

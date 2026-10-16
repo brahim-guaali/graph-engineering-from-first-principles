@@ -1,0 +1,41 @@
+$ python 02-explicit-graph/run.py
+
+=== 1. Happy path: $640 late catering order ===
+  [  0.0s ->  29.6s] classify  wrote ['claim']
+  [ 29.6s ->  31.6s] order     wrote ['order']
+  [ 31.6s ->  33.6s] policy    wrote ['policy']
+  [ 33.6s ->  35.6s] fraud     wrote ['fraud']
+  [ 35.6s ->  55.9s] decide    wrote ['decision']
+  [ 55.9s ->  60.0s] approval  wrote ['approval']
+  [ 60.0s ->  60.0s] refund    wrote ['payment']
+  [ 60.0s ->  60.0s] reply     wrote ['reply']
+  -> path: classify > order > policy > fraud > decide > approval > refund > reply
+  -> refund $640 under §1: The order was delivered 70 minutes late, which exceeds the 45-minute threshold for a full refund under §1.
+  -> 60.0s, 2 model calls, 672 tokens in, 138 out, ~$0.0005
+  The state is data, not text: fraud score = 0.08, minutes late = 70, clause = §1
+
+=== 2. A complaint takes another branch ===
+  [  0.0s ->  19.7s] classify  wrote ['claim']
+  [ 19.7s ->  19.7s] handoff   wrote ['reply']
+  -> path: classify > handoff
+
+=== 3. A buggy node writes a field it doesn't own ===
+  !! node 'fraud' wrote ['decision'], but it only owns ['fraud']
+  Ownership turns a silent bug (the fraud check deciding the refund) into a loud one.
+
+=== 4. The fraud service hangs ===
+  [  0.0s ->  20.0s] classify  wrote ['claim']
+  [ 20.0s ->  22.0s] order     wrote ['order']
+  [ 22.0s ->  24.0s] policy    wrote ['policy']
+  !! the fraud node timed out at 29.1s. We know exactly which node
+  failed and what the state held, but the state lived in this process. It's gone.
+
+What the graph fixed:
+  - the state is named fields; each node reads only what it needs
+  - step order and the $500 rule are code; the model makes 2 narrow judgments with typed answers
+  - a bug or a failure points at one node
+Where it still breaks:
+  1) one node at a time: the three lookups still run in series
+  2) a crash still loses the run: the state only lives in memory
+  3) the approval still blocks: no way to wait days for a person
+Next: 03-supersteps runs every ready node at once.

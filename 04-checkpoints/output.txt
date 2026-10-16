@@ -1,0 +1,76 @@
+$ python 04-checkpoints/run.py
+
+=== 1. The fraud service hangs: resume re-runs only the failed node ===
+  thread t-dfc417 (pid 48828)
+  round 1 [  0.0s ->  18.9s] classify                 checkpoint 1 saved
+  ✕ ReadTimeout: timed out
+  The run failed, but round 2's finished work was saved:
+  saved writes for round 2: ['order', 'policy']
+  checkpoint 0: running     next=['classify']  state has []
+  checkpoint 1: failed      next=['order', 'policy', 'fraud']  state has ['claim', 'spent']  (fraud: ReadTimeout('timed out'))
+
+  Resume in a new process: classify is not called again; order and policy are reused.
+  resuming t-dfc417 from checkpoint 1 (failed: fraud: ReadTimeout('timed out')) (pid 48861)
+  round 2: reusing saved results of ['order', 'policy']
+  round 2 [  0.0s ->   2.0s] fraud + order + policy   checkpoint 2 saved
+  round 3 [  2.0s ->  22.0s] decide                   checkpoint 3 saved
+  round 4 [ 22.0s ->  22.0s] ask_manager              checkpoint 4 saved
+  round 5 [ 22.0s] paused: {'approval_id': 'apr_dfe5af42', 'question': 'Refund $640? (The order was delivered 70 minutes late, which exceeds the 45-minute threshold for a full refund under §1.)'}
+  ⏸ paused: Refund $640? (The order was delivered 70 minutes late, which exceeds the 45-minute threshold for a full refund under §1.)  (apr_dfe5af42)
+  1 model calls, 558 tokens in, 100 out, ~$0.0004 in this process
+  (manager approves apr_dfe5af42)
+  apr_dfe5af42 was approved: resuming t-dfc417 from checkpoint 4 (pid 48924)
+  round 5 [  0.0s ->   0.0s] approval                 checkpoint 5 saved
+  round 6 [  0.0s ->   0.0s] refund                   checkpoint 6 saved
+  round 7 [  0.0s ->   0.0s] reply                    checkpoint 7 saved
+  ✓ done: refund $640 under §1
+  0 model calls, 0 tokens in, 0 out, ~$0.0000 in this process
+
+=== 2. Waiting for the manager: the process exits and nothing is held open ===
+  thread t-cc391a (pid 48925)
+  round 1 [  0.0s ->  19.2s] classify                 checkpoint 1 saved
+  round 2 [ 19.2s ->  21.3s] fraud + order + policy   checkpoint 2 saved
+  round 3 [ 21.3s ->  42.6s] decide                   checkpoint 3 saved
+  round 4 [ 42.6s ->  42.6s] ask_manager              checkpoint 4 saved
+  round 5 [ 42.6s] paused: {'approval_id': 'apr_a90ffbe9', 'question': 'Refund $640? (The order was delivered 70 minutes late, which exceeds the 45-minute threshold for a full refund.)'}
+  ⏸ paused: Refund $640? (The order was delivered 70 minutes late, which exceeds the 45-minute threshold for a full refund.)  (apr_a90ffbe9)
+  2 model calls, 679 tokens in, 128 out, ~$0.0005
+  The process has exited. The run is a row in SQLite: checkpoint 4, interrupted.
+  ...it's Thursday. The manager approves from their own terminal:
+  $ python -m agentkit.ops approve apr_a90ffbe9
+  apr_a90ffbe9 was approved: resuming t-cc391a from checkpoint 4 (pid 48982)
+  round 5 [  0.0s ->   0.0s] approval                 checkpoint 5 saved
+  round 6 [  0.0s ->   0.0s] refund                   checkpoint 6 saved
+  round 7 [  0.0s ->   0.0s] reply                    checkpoint 7 saved
+  ✓ done: refund $640 under §1
+  0 model calls, 0 tokens in, 0 out, ~$0.0000 in this process
+
+=== 3. kill -9 in the middle of a run, then resume in a fresh process ===
+  thread t-8a1d99 (pid 48985)
+  round 1 [  0.0s ->  19.6s] classify                 checkpoint 1 saved
+  round 2 [ 19.6s ->  21.6s] fraud + order + policy   checkpoint 2 saved
+  💥 killed pid 48985 during round 3. Last checkpoint: 2
+  resuming t-8a1d99 from checkpoint 2 (running: ) (pid 49042)
+  round 3 [  0.0s ->  19.9s] decide                   checkpoint 3 saved
+  round 4 [ 19.9s ->  19.9s] refund                   checkpoint 4 saved
+  round 5 [ 19.9s ->  19.9s] reply                    checkpoint 5 saved
+  ✓ done: refund $18 under §2
+  1 model calls, 552 tokens in, 107 out, ~$0.0004 in this process
+  Money moved for A-8120: $18 (once)
+
+=== 4. Time travel: load an old checkpoint, change one field, run forward ===
+  forked t-dfc417 after round 2 into t-dfc417-fork-3dd7 with fraud score 0.92
+  round 3 [  0.0s ->  19.8s] decide                   checkpoint 3 saved
+  round 4 [ 19.8s ->  19.8s] reply                    checkpoint 4 saved
+  ✓ done: refuse $0 under §4
+  Only decide and reply ran: 1 model calls, 549 tokens in, 99 out, ~$0.0004. Same order, same policy, a different answer.
+
+What checkpoints fixed:
+  - a failure costs one node: the rest of the round and every earlier round are kept
+  - a person is a node: the run pauses, the process exits, and it resumes days later anywhere
+  - a crash (even kill -9) loses at most the round in flight
+  - an audit trail (history) and time travel (fork an old checkpoint, change a field)
+Where it still breaks:
+  1) a node that pays and then crashes before its checkpoint is re-run on resume: paid twice
+  2) nothing stops a run that spends too much
+Next: 05-side-effects adds idempotency keys and a budget.

@@ -42,6 +42,20 @@ The loop hasn't disappeared. A node like `decide` could run its own small loop i
 | A node writes a field it doesn't own | silently corrupts the run | `PermissionError: node 'fraud' wrote ['decision'], but it only owns ['fraud']` |
 | A complaint about a rider | depends on the prompt | `classify > handoff`, by an edge |
 
+## Recorded run
+
+![The explicit graph after the happy path](graph.png)
+
+*The live viewer replaying traced run `0080e4f9` at its last event: green nodes ran, green edges are the path the run took (worked out from the round numbers in its events). Screenshot by Playwright of `/ui?replay=0080e4f9`; the events are in [`viz/data/run-0080e4f9.json`](../viz/data/run-0080e4f9.json).*
+
+![A node writing a field it doesn't own](ownership.png)
+
+*The live viewer replaying traced run `1272c3b0` at its last event: green nodes ran, green edges are the path the run took (worked out from the round numbers in its events). Screenshot by Playwright of `/ui?replay=1272c3b0`; the events are in [`viz/data/run-1272c3b0.json`](../viz/data/run-1272c3b0.json). The red node is the buggy `fraud` node stopped by field ownership.*
+
+![Terminal output of stage 2](terminal.png)
+
+*Terminal output of `python 02-explicit-graph/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped.*
+
 ## Where it breaks
 
 1. **Still serial.** The runner does one node at a time, so `order`, `policy` and `fraud` take 6 s even though the graph shows they're independent.

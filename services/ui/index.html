@@ -55,7 +55,7 @@ svg text { fill: var(--text); }
 @keyframes pulse { 50% { stroke-opacity: .35; } }
 .edge { fill: none; stroke: var(--idle); stroke-width: 1.5; }
 .edge.cond { stroke-dasharray: 5 4; }
-.edge.hot { stroke: var(--text-2); }
+.edge.hot { stroke: var(--good); stroke-width: 2.5; }
 .elabel { font-size: 10.5px; fill: var(--text-2) !important; }
 .tl-row text { font-size: 12px; }
 .tl-axis text { font-size: 10.5px; fill: var(--muted) !important; }
@@ -77,6 +77,12 @@ svg text { fill: var(--text); }
 .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
 #tip { position: fixed; pointer-events: none; background: var(--text); color: var(--surface); font-size: 12px; padding: 5px 8px; border-radius: 6px; opacity: 0; transition: opacity .1s; z-index: 10; }
 .empty { color: var(--text-2); padding: 40px; text-align: center; }
+body.replay header, body.replay aside { display: none; }
+body.replay .layout { grid-template-columns: 1fr; min-height: 0; }
+body[data-only] main > .card:first-child { display: none; }
+body[data-only="graph"] main > .card:nth-child(3), body[data-only="graph"] .two { display: none; }
+body[data-only="timeline"] main > .card:nth-child(2), body[data-only="timeline"] .two { display: none; }
+body[data-only="graph,timeline"] .two { display: none; }
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
   aside { max-height: 180px; border-right: 0; border-bottom: 1px solid var(--border); }
@@ -161,7 +167,11 @@ function nodeStatus(r, n) {
   const s = (r.spans[n] || []).at(-1);
   return s ? s.status : "idle";
 }
-function now(r) { return r.status === "running" ? (Date.now() - r.localStart) / 1000 : r.last; }
+let replayAt = null;         // replay mode: the time being shown
+function now(r) {
+  if (replayAt !== null) return replayAt;
+  return r.status === "running" ? (Date.now() - r.localStart) / 1000 : r.last;
+}
 
 // ---------- graph layout: longest path from the entry, back edges drawn underneath ----------
 function layout(g) {
@@ -197,12 +207,13 @@ function drawGraph(r) {
   const g = r.graph;
   if (!g.nodes.length) return "<div class='stat'>This run has no graph.</div>";
   const L = layout(g), kinds = Object.fromEntries(g.nodes.map(n => [n.id, n]));
+  const taken = traversed(r);
   let edges = "", labels = "";
   const labelled = new Set();
   let arcs = 0;
   g.edges.forEach((e, i) => {
     const a = L.pos[e.from], b = L.pos[e.to]; if (!a || !b) return;
-    const hot = nodeStatus(r, e.from) !== "idle" && nodeStatus(r, e.to) !== "idle";
+    const hot = taken.has(e.from + ">" + e.to);
     let d, mx, my;
     if (L.back.has(i)) {
       const y = Math.max(a.y, b.y) + L.H + 26;
@@ -230,22 +241,38 @@ function drawGraph(r) {
     if (last && last.end != null && st === "done") sub += " " + fmt(last.end - last.start);
     if (spans.length > 1) sub += ` ×${spans.length}`;
     nodes += `<g class="node ${st}" data-node="${esc(n.id)}"><rect x="${p.x}" y="${p.y}" width="${L.W}" height="${L.H}" rx="8"/>
-      <text class="kind" x="${p.x + 10}" y="${p.y + 14}">${esc(n.kind || "")}</text>
+      <text class="kind" x="${p.x + 10}" y="${p.y + 14}">${esc(short(n.kind || "", 11))}</text>
       <text class="label" x="${p.x + 10}" y="${p.y + 31}">${esc(short(n.label || n.id, 15))}</text>
       <text class="st" x="${p.x + L.W - 8}" y="${p.y + 14}" text-anchor="end">${esc(sub)}</text></g>`;
   }
   return `<div class="graph-wrap"><svg viewBox="0 0 ${L.width} ${L.height}" style="width:100%;min-width:${Math.round(L.width * 0.72)}px;max-width:${L.width}px;height:auto" role="img" aria-label="graph of this run">
-    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-2)"/></marker></defs>
+    <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--text-2)"/></marker></defs>
     ${edges}${labels}${nodes}</svg></div>
     <div class="legend"><span style="--c:var(--running)">● running</span><span style="--c:var(--good)">✓ done</span><span style="--c:var(--warning)">⏸ waiting for a person</span><span style="--c:var(--critical)">✕ failed</span><span style="--c:var(--idle)">○ not run</span></div>`;
 }
 
+// The edges this run actually took. With rounds (our engines): A ran in the round just before B
+// (in the loop, the model and the tools it picked share a round). Without (LangGraph): B started as A ended.
+function traversed(r) {
+  const spans = Object.entries(r.spans).flatMap(([n, ss]) => ss.map(s => ({n, ...s})));
+  const out = new Set();
+  for (const b of spans) {
+    for (const a of spans) {
+      if (a === b || a.end == null) continue;
+      if (a.round != null && b.round != null) {
+        if (a.round === b.round - 1 || (a.round === b.round && a.n === "model" && b.n !== "model")) out.add(a.n + ">" + b.n);
+      } else if (a.end <= b.start + 0.01 && b.start - a.end < 0.3) out.add(a.n + ">" + b.n);
+    }
+  }
+  return out;
+}
+
 // ---------- timeline: one row per node, one bar per time it ran ----------
 function drawTimeline(r) {
-  const order = r.graph.nodes.map(n => n.id).filter(id => r.spans[id]);
+  const order = r.graph.nodes.map(n => n.id).filter(id => r.spans[id] || (replayAt !== null && (window.replayNodes || []).includes(id)));
   for (const id of Object.keys(r.spans)) if (!order.includes(id)) order.push(id);
   if (!order.length) return "<div class='stat'>Nothing has run yet.</div>";
-  const end = Math.max(now(r), 1), labelW = 150, width = Math.max(560, ($("#main").clientWidth || 800) - 64);
+  const end = replayAt !== null ? window.replayEnd : Math.max(now(r), 1), labelW = 150, width = Math.max(560, ($("#main").clientWidth || 800) - 64);
   const plotW = width - labelW - 10, rowH = 26, height = order.length * rowH + 26;
   const x = t => labelW + (t / end) * plotW;
   const step = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300].find(s => end / s <= 8) || 600;
@@ -257,7 +284,7 @@ function drawTimeline(r) {
     const y = k * rowH;
     const name = (r.graph.nodes.find(n => n.id === id) || {}).label || id;
     rows += `<g class="tl-row"><text x="${labelW - 8}" y="${y + 17}" text-anchor="end">${esc(short(name, 20))}</text>`;
-    for (const s of r.spans[id]) {
+    for (const s of r.spans[id] || []) {
       const e = s.end == null ? now(r) : s.end, w = Math.max(3, x(e) - x(s.start));
       const tip = `${id}: ${s.status}, ${fmt(e - s.start)} (from ${fmt(s.start)})${s.error ? " · " + s.error : ""}`;
       rows += `<rect class="bar ${s.status}" x="${x(s.start)}" y="${y + 6}" width="${w}" height="${rowH - 10}" data-tip="${esc(tip)}"/>`;
@@ -308,6 +335,7 @@ function render() {
 let dirty = true;
 setInterval(() => {
   const r = runs.get(selected);
+  if (replayAt !== null) return;
   if (dirty || (r && r.status === "running")) { render(); dirty = false; }
 }, 250);
 
@@ -327,6 +355,28 @@ document.addEventListener("mousemove", e => {
   tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (e.clientY + 14) + "px";
 });
 
+// ---------- replay: /ui?replay=<run id>[&only=graph,timeline] draws a past run at any moment ----------
+// window.seek(t) renders the run as it stood t seconds in; used to make GIF frames from real runs.
+async function bootReplay(id, only) {
+  const run = await (await fetch("/runs/" + id)).json();
+  const events = run.events;
+  window.replayEnd = Math.max(...events.map(e => e.t));
+  window.replayNodes = [...new Set(events.filter(e => e.type === "node_started").map(e => e.node))];  // rows stay put
+  document.body.classList.add("replay");
+  if (only) document.body.dataset.only = only;
+  window.seek = t => {
+    runs.clear(); replayAt = t; live = false;
+    for (const e of events) if (e.t <= t) apply(e);
+    const r = runs.get(id);
+    if (r && t < window.replayEnd && r.status !== "paused") r.status = "running";
+    for (const spans of Object.values(r ? r.spans : {})) for (const sp of spans) if (sp.end == null) sp.status = sp.status === "waiting" ? "waiting" : "running";
+    selected = id; render();
+    return t;
+  };
+  window.seek(0);
+  window.replayReady = true;
+}
+
 async function boot() {
   const list = await (await fetch("/runs")).json();
   for (const meta of list.slice(0, 30).reverse()) {
@@ -341,7 +391,8 @@ async function boot() {
   es.onerror = () => { $("#conn").classList.remove("on"); $("#connText").textContent = "reconnecting"; };
   es.onmessage = m => { apply(JSON.parse(m.data)); dirty = true; };
 }
-boot();
+const params = new URLSearchParams(location.search);
+if (params.get("replay")) bootReplay(params.get("replay"), params.get("only")); else boot();
 </script>
 </body>
 </html>

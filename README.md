@@ -8,7 +8,9 @@ The final version runs independent steps in parallel, survives crashes, waits da
 
 Everything is real: a real model (Gemini, free tier) with real tool calls and structured output, a real HTTP platform (orders, refund policy, fraud scoring, payments with idempotency keys, approvals), real crashes, SQLite checkpoints and a test suite. Each stage ends with **where it breaks**, which is the reason for the next one. Read the commits in order and the history reads like the course.
 
-![The same $640 refund in three structures](viz/timelines.png)
+![The loop and the graph on the same clock](viz/loop-vs-supersteps.gif)
+
+*Two real runs of the $640 refund replayed on one clock: the stage 1 loop (top) runs its lookups one after another; the stage 3 graph (bottom) runs them in one round and finishes first. Frames captured from the live viewer's replay mode, assembled with ffmpeg. Every image in this repo comes from a recorded run, and its caption says how it was made.*
 
 ## The idea in one paragraph
 
@@ -70,6 +72,8 @@ Open **http://127.0.0.1:8700/ui** while any stage runs. Every run streams its ev
 - **Log:** every node start, finish and failure, with times.
 
 ![The live run viewer](viz/viewer.png)
+
+Any past run can be replayed: `http://127.0.0.1:8700/ui?replay=<run id>`, with `&only=graph,timeline` for a compact view. The GIFs in each stage folder are made that way (`viz/record_runs.sh` re-runs every stage and keeps its `output.txt`; `viz/make_gif.sh` turns replay frames into a GIF).
 
 ## Results
 

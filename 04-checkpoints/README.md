@@ -51,6 +51,24 @@ The new process ran **only `fraud`** (2 s) and never called `classify` again. In
 
 **4. Time travel.** We forked a finished run after round 2 with the fraud score changed to 0.92. Only `decide` and `reply` ran (1 model call), and the answer became **refuse under §4**: same order, same policy, different facts. That's how you test a fix against a real past case.
 
+## Recorded run
+
+![Crash, resume and pause replayed](crash-and-resume.gif)
+
+*Replay of real run `t-dfc417`: 71 frames sampled evenly over its 47 s (about 5× speed), captured by Playwright from `/ui?replay=t-dfc417` and assembled with ffmpeg by [`viz/make_gif.sh`](../viz/make_gif.sh). An MP4 of the same frames sits next to it. The red bar is the fraud call that hung; the next green bar is the only node the new process re-ran. Amber is the pause for the manager.*
+
+![Terminal output: crash and resume](terminal-crash.png)
+
+*Terminal output of `python 04-checkpoints/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped.*
+
+![Terminal output: pause, kill -9, time travel](terminal-pause-kill.png)
+
+*Terminal output of `python 04-checkpoints/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped. Each `pid` is a separate process.*
+
+![The paused-then-resumed run](graph.png)
+
+*The live viewer replaying traced run `t-cc391a` at its last event: green nodes ran, green edges are the path the run took (worked out from the round numbers in its events). Screenshot by Playwright of `/ui?replay=t-cc391a`; the events are in [`viz/data/run-t-cc391a.json`](../viz/data/run-t-cc391a.json). `approval` ran twice: once to pause (the process then exited), once in a new process to resume.*
+
 ## Where it breaks
 
 1. **Replays repeat side effects.** If the process dies *inside* the `refund` node, after the payment provider moved the money but before the checkpoint, the resume runs `refund` again from the top. The customer is paid twice.

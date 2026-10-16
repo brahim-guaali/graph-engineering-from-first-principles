@@ -160,7 +160,43 @@ def evaluation():
     plt.close(fig)
 
 
+def per_case():
+    """The same 12 questions, both designs: outcome, model calls and tokens, case by case."""
+    files = sorted((ROOT / "06-reliability" / "results").glob("eval-*.json"))
+    if not files:
+        return
+    rows = json.loads(files[-1].read_text())
+    names = [r["case"] for r in rows]
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6.2), sharey=True, gridspec_kw={"width_ratios": [1, 1.6]})
+    ys = range(len(rows))
+    for ax, key, title in ((ax1, "calls", "model calls"), (ax2, "input_tokens", "input tokens")):
+        loop = [r["loop"]["usage"].get(key, 0) for r in rows]
+        graph = [r["graph"]["usage"].get(key, 0) for r in rows]
+        ax.barh([y - 0.2 for y in ys], loop, height=0.38, color=BLUE, label="agent loop")
+        ax.barh([y + 0.2 for y in ys], graph, height=0.38, color=ORANGE, label="graph")
+        for y, a, b in zip(ys, loop, graph):
+            ax.text(a, y - 0.2, f" {a:,}", va="center", fontsize=8.5, color=INK2)
+            ax.text(b, y + 0.2, f" {b:,}", va="center", fontsize=8.5, color=INK2)
+        ax.set_title(title, loc="left", fontsize=11, color=INK2)
+        ax.grid(axis="x", color=GRID)
+        ax.set_axisbelow(True)
+        ax.tick_params(axis="y", length=0)
+    marks = [("✓" if r["loop"]["correct"] else "✕") + ("✓" if r["graph"]["correct"] else "✕") for r in rows]
+    ax1.set_yticks(list(ys), [f"{n}  {m}" for n, m in zip(names, marks)], fontsize=10)
+    ax1.invert_yaxis()
+    ax2.legend(frameon=False, loc="lower right", ncol=2, bbox_to_anchor=(1.0, 1.04))
+    fig.suptitle("Same 12 questions, both designs (✓✓ = right outcome for loop, graph)", x=0.01, ha="left",
+                 fontsize=14, fontweight="bold")
+    fig.text(0.01, 0.925, "Real run on gemini-3.5-flash; outcomes read from the platform (money moved, manager asked).",
+             fontsize=10, color=INK2)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.subplots_adjust(top=0.84)
+    fig.savefig(HERE / "per-case.png", dpi=200)
+    plt.close(fig)
+
+
 if __name__ == "__main__":
+    per_case()
     timelines()
     context()
     reliability()

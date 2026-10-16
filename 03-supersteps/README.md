@@ -50,6 +50,24 @@ round 4 [28.1s -> 32.2s] approval                 wrote ['approval']
 
 A loop never has to answer "which write wins?" because only one thing happens at a time. A graph makes you answer it up front, and in exchange it runs things in parallel safely.
 
+## Recorded run
+
+![Supersteps replayed](supersteps.gif)
+
+*Replay of real run `263154ac`: 61 frames sampled evenly over its 47 s (about 5× speed), captured by Playwright from `/ui?replay=263154ac` and assembled with ffmpeg by [`viz/make_gif.sh`](../viz/make_gif.sh). An MP4 of the same frames sits next to it.*
+
+![The loop and supersteps on the same clock](../viz/loop-vs-supersteps.gif)
+
+*The stage 1 run (`0b9e7fa2`) and this stage's run (`263154ac`) replayed on one clock, 0 to 95 s: the loop's lookups form a staircase; here they are three bars in one round. Timeline frames captured by Playwright, stacked by [`viz/compose.py`](../viz/compose.py), assembled by ffmpeg.*
+
+![The run without a reducer](no-reducer.png)
+
+*The live viewer replaying traced run `7dd080d2` at its last event: green nodes ran, green edges are the path the run took (worked out from the round numbers in its events). Screenshot by Playwright of `/ui?replay=7dd080d2`; the events are in [`viz/data/run-7dd080d2.json`](../viz/data/run-7dd080d2.json). Round 2 finished, then applying three writes to `evidence` with no reducer raised `InvalidUpdateError`.*
+
+![Terminal output of stage 3](terminal.png)
+
+*Terminal output of `python 03-supersteps/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped.*
+
 ## Where it breaks
 
 1. **One failed node still loses the run.** When the fraud call hung in round 2, the order and policy results from the same round were thrown away with everything else.

@@ -1,0 +1,34 @@
+$ python 03-supersteps/run.py
+
+=== 1. Happy path, in rounds ===
+  round 1 [  0.0s ->  19.3s] classify                 wrote ['claim', 'spent']
+  round 2 [ 19.3s ->  21.3s] order + policy + fraud   wrote ['evidence', 'fraud', 'order', 'policy']
+  round 3 [ 21.3s ->  42.6s] decide                   wrote ['decision', 'spent']
+  round 4 [ 42.6s ->  46.7s] approval                 wrote ['approval']
+  round 5 [ 46.7s ->  46.7s] refund                   wrote ['payment']
+  round 6 [ 46.7s ->  46.7s] reply                    wrote ['reply']
+  -> refund $640 under §1, 46.7s, 2 model calls, 672 tokens in, 135 out, ~$0.0005
+  Round 2 took as long as its slowest lookup (2 s), not the sum of all three (6 s).
+  evidence, merged by the append reducer: ['order A-7731: $640, 70 min late', 'policy v3: 6 clauses', 'fraud score 0.08']
+  spent, summed by the add reducer: $0.00054
+
+=== 2. Take the reducer off 'evidence' ===
+  !! InvalidUpdateError: 'evidence' got 3 writes in one round (from ['order', 'policy', 'fraud']) and has no reducer to combine them
+  A loop never has to answer 'which write wins?' because only one thing runs at a time.
+  A graph makes you answer it up front, and in exchange runs things in parallel safely.
+
+=== 3. The fraud service hangs in round 2 ===
+  round 1 [  0.0s ->  20.4s] classify                 wrote ['claim', 'spent']
+  !! the fraud node timed out at 25.5s.
+  The order and policy nodes in the same round succeeded, and their results were
+  thrown away with the run. The end of a round is a natural place to save...
+
+What supersteps fixed:
+  - fan-out and fan-in: independent lookups overlap
+  - snapshot reads: nodes in one round never see each other's half-finished work,
+    so the result can't depend on which node finished first
+  - reducers: parallel writes to one field combine by a rule, or fail loudly
+Where it still breaks:
+  1) one failed node still loses the whole run, its siblings' results included
+  2) still no way to stop and wait days for a person
+Next: 04-checkpoints saves the state at the end of every round.

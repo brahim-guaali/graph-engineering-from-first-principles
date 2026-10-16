@@ -1,0 +1,21 @@
+$ python 07-langgraph/run.py
+
+=== 1. $640 late catering: fan-out, verify, pause for the manager, resume ===
+  paused before ('approval',): Refund $640? (The order was delivered 70 minutes late, which is more than 45 minutes past the promised time, qualifying for a full refund of the order total under §1.)
+  ✓ refund $640 under §1; evidence ['fraud score 0.08', 'order A-7731: $640, 70 min late', 'policy v3']; 2 model calls, 672 tokens in, 147 out, ~$0.0006
+  10 checkpoints in SQLite, e.g. next=('classify',) then ('order', 'policy', 'fraud')
+
+=== 2. The fraud service hangs: a RetryPolicy on the node absorbs it ===
+  ✓ refund $18 under §2. The run never failed: the fraud node was retried by the framework.
+
+=== 3. The hybrid: a complaint goes to a node with an agent loop inside ===
+  ✓ ticket tkt_c78a4cc5: rider, normal: Rider was rude to customer C-3300 at the door yesterday
+  reply: I'm very sorry to hear that your experience with the rider wasn't pleasant. I've filed a support ticket regarding this issue so our team can address it. Thank you for letting us know.
+
+=== 4. Time travel with update_state: what if the fraud score had been 0.92? ===
+  original: refund $72 under §1
+  fork:     refuse $0 under §4  (only decide, verify and reply ran again)
+
+Everything we built by hand exists in the framework, under the same names. What the framework
+can't decide for you is the design: the state, which judgments go to a model, which edges are
+code, where a person sits, which nodes touch money. That is graph engineering.

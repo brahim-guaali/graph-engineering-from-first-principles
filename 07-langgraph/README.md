@@ -51,6 +51,20 @@ graph LR
 | Complaint about a rider | `classify → support`. The loop inside filed `ticket rider, normal: "Rider was rude to customer C-3300 at the door yesterday"` and wrote the customer a reply |
 | Time travel | `update_state` on the checkpoint before `decide` with fraud 0.92: the original refund of $72 under §1 became **refuse under §4**. Only `decide`, `verify` and `reply` ran again |
 
+## Recorded run
+
+![LangGraph run](graph.png)
+
+*The live viewer replaying traced run `lg-22f714` at its last event: green nodes ran, green edges are the path the run took (worked out from the round numbers in its events). Screenshot by Playwright of `/ui?replay=lg-22f714`; the events are in [`viz/data/run-lg-22f714.json`](../viz/data/run-lg-22f714.json). The graph is LangGraph's own `get_graph()`; rounds are LangGraph's `langgraph_step`.*
+
+![The hybrid: a loop inside the support node](support.png)
+
+*The live viewer replaying traced run `lg-b1f181` at its last event: green nodes ran, green edges are the path the run took (worked out from the round numbers in its events). Screenshot by Playwright of `/ui?replay=lg-b1f181`; the events are in [`viz/data/run-lg-b1f181.json`](../viz/data/run-lg-b1f181.json). One graph node, `support`, ran its own tool loop for 53 s and filed a ticket.*
+
+![Terminal output of stage 7](terminal.png)
+
+*Terminal output of `python 07-langgraph/run.py`, recorded on 2026-10-16 with gemini-3.5-flash (full text: [`output.txt`](output.txt)), rendered to PNG by [`viz/terminal.py`](../viz/terminal.py) from the file, not retyped.*
+
 ## When *not* to use a graph
 
 The structure has real costs. Parallel branches multiply spend. A graph splits work into nodes with partial views, which breaks down when every part depends on every other (like the middle of writing one piece of code). It has to be drawn before the run, which is wrong for open-ended debugging. And most real workflows are a straight line with one branch, where a framework adds moving parts and nothing else.

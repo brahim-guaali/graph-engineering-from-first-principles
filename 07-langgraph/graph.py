@@ -54,7 +54,7 @@ def build(llm, platform, tracer=NullTracer(), db=DB):
     def traced(name, fn):
         """Report each node to the live viewer; LangGraph does the rest."""
         def node(state, config):
-            tracer.node_started(name)
+            tracer.node_started(name, round=config.get("metadata", {}).get("langgraph_step"))
             try:
                 update = fn(state, config)
             except Exception as e:
