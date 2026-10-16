@@ -4,6 +4,8 @@ A course in runnable code. We take one real agent job from a food-delivery app a
 
 The final version runs independent steps in parallel, survives crashes, waits days for an operations manager, never pays twice, and checks the model's judgments before acting on them.
 
+📝 The write-up: [I rebuilt one AI agent seven times to understand graph engineering](https://medium.com/@brahimg/i-rebuilt-one-ai-agent-seven-times-to-understand-graph-engineering-80b9983cd921) (Medium).
+
 Everything is real: a real model (Gemini, free tier) with real tool calls and structured output, a real HTTP platform (orders, refund policy, fraud scoring, payments with idempotency keys, approvals), real crashes, SQLite checkpoints and a test suite. Each stage ends with **where it breaks**, which is the reason for the next one. Read the commits in order and the history reads like the course.
 
 ![The same $640 refund in three structures](viz/timelines.png)
