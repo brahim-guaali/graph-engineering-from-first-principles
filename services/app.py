@@ -49,6 +49,8 @@ def db():
             status text, decided_by text, created_at text, decided_at text);
         create table if not exists notifications (
             id text primary key, customer text, text text, created_at text);
+        create table if not exists tickets (
+            id text primary key, customer text, category text, priority text, summary text, created_at text);
     """)
     try:
         with conn:
@@ -183,6 +185,22 @@ def notify(n: Notification):
     return {"id": nid}
 
 
+class Ticket(BaseModel):
+    customer: str
+    category: str            # rider | restaurant | app | other
+    priority: str            # low | normal | high
+    summary: str
+
+
+@app.post("/tickets")
+def create_ticket(t: Ticket):
+    tid = "tkt_" + uuid.uuid4().hex[:8]
+    with _lock, db() as conn:
+        conn.execute("insert into tickets values (?,?,?,?,?,?)",
+                     (tid, t.customer, t.category, t.priority, t.summary, now()))
+    return {"id": tid, **t.model_dump()}
+
+
 # --- admin: fault injection and reset, for the demos --------------------------------------
 @app.post("/admin/faults")
 def set_faults(faults: dict[str, int]):
@@ -194,7 +212,8 @@ def set_faults(faults: dict[str, int]):
 def reset():
     _faults.clear()
     with _lock, db() as conn:
-        conn.executescript("delete from payments; delete from approvals; delete from notifications;")
+        conn.executescript("delete from payments; delete from approvals; delete from notifications; "
+                           "delete from tickets;")
     return {"ok": True}
 
 

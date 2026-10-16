@@ -56,6 +56,10 @@ class Platform:
     def notify(self, customer, text):
         return self._post("/notifications", {"customer": customer, "text": text})
 
+    def create_ticket(self, customer, category, priority, summary):
+        return self._post("/tickets", {"customer": customer, "category": category,
+                                       "priority": priority, "summary": summary})
+
     # demo controls
     def inject_faults(self, **faults):
         return self._post("/admin/faults", faults)
