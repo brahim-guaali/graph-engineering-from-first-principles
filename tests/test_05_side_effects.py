@@ -41,8 +41,9 @@ def test_with_a_key_a_replay_pays_once(platform, cp):
 def test_over_budget_stops_before_any_payment(platform, cp):
     llm = ScriptedStructured(answers(order_id="A-8120", amount=18))
     g = refund.build(llm, Platform(platform), checkpointer=cp)
-    g.g.nodes["classify"] = lambda s:                        # an expensive classification {"claim": refund.judgments.Classification(
-        kind="refund_request", order_id="A-8120"), "spent": 1.0}
+    expensive = {"claim": refund.judgments.Classification(kind="refund_request", order_id="A-8120"),
+                 "spent": 1.0}                                 # pretend classify cost $1
+    g.g.nodes["classify"] = lambda s: expensive
     result = g.invoke({"request": DESSERT, "run_id": "r2", "budget": 0.5}, thread="r2", log=lambda *_: None)
     assert result["state"]["reply"]["queue"] == "support-escalations"
     assert Platform(platform).payments("A-8120")["count"] == 0
