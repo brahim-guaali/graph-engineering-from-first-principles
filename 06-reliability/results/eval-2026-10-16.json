@@ -1,0 +1,587 @@
+[
+ {
+  "case": "late-catering",
+  "expect": {
+   "action": "refund",
+   "amount": 640,
+   "approval": true
+  },
+  "loop": {
+   "seconds": 84.43769387499196,
+   "usage": {
+    "calls": 4,
+    "input_tokens": 3746,
+    "output_tokens": 379,
+    "cost": 0.002071
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "request_manager_approval",
+    "issue_refund",
+    "notify_customer"
+   ],
+   "paid": 640.0,
+   "asked_manager": true,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 49.09384204199887,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 672,
+    "output_tokens": 140,
+    "cost": 0.000552
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "ask_manager",
+    "approval",
+    "refund",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 640.0,
+   "asked_manager": true,
+   "correct": true
+  }
+ },
+ {
+  "case": "missing-dessert",
+  "expect": {
+   "action": "refund",
+   "amount": 18,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 94.14236308299587,
+   "usage": {
+    "calls": 4,
+    "input_tokens": 3520,
+    "output_tokens": 233,
+    "cost": 0.001638
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "issue_refund",
+    "notify_customer"
+   ],
+   "paid": 18.0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 48.85470249998616,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 650,
+    "output_tokens": 145,
+    "cost": 0.000558
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "refund",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 18.0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "rude-rider",
+  "expect": {
+   "action": "handoff",
+   "amount": 0,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 19.876023249991704,
+   "usage": {
+    "calls": 1,
+    "input_tokens": 499,
+    "output_tokens": 51,
+    "cost": 0.000277
+   },
+   "path": [],
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 20.40797712499625,
+   "usage": {
+    "calls": 1,
+    "input_tokens": 92,
+    "output_tokens": 28,
+    "cost": 9.8e-05
+   },
+   "path": [
+    "classify",
+    "handoff"
+   ],
+   "attempts": null,
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "slightly-late",
+  "expect": {
+   "action": "credit",
+   "amount": 0,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 86.89189037500182,
+   "usage": {
+    "calls": 3,
+    "input_tokens": 2384,
+    "output_tokens": 223,
+    "cost": 0.001273
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "notify_customer"
+   ],
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 45.59597087500151,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 617,
+    "output_tokens": 143,
+    "cost": 0.000543
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "fraud",
+  "expect": {
+   "action": "refuse",
+   "amount": 0,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 65.01192745901062,
+   "usage": {
+    "calls": 3,
+    "input_tokens": 2334,
+    "output_tokens": 194,
+    "cost": 0.001185
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "notify_customer"
+   ],
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 43.3902731249982,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 609,
+    "output_tokens": 143,
+    "cost": 0.00054
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "cancelled-after-cooking",
+  "expect": {
+   "action": "credit",
+   "amount": 0,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 66.89335766600561,
+   "usage": {
+    "calls": 3,
+    "input_tokens": 2348,
+    "output_tokens": 183,
+    "cost": 0.001162
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "notify_customer"
+   ],
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 45.00828912499128,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 607,
+    "output_tokens": 139,
+    "cost": 0.00053
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "late-grill",
+  "expect": {
+   "action": "refund",
+   "amount": 72,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 89.90117804100737,
+   "usage": {
+    "calls": 4,
+    "input_tokens": 3461,
+    "output_tokens": 263,
+    "cost": 0.001696
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "issue_refund",
+    "notify_customer"
+   ],
+   "paid": 72.0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 45.119303665996995,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 608,
+    "output_tokens": 126,
+    "cost": 0.000497
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "refund",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 72.0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "spoiled-pizza",
+  "expect": {
+   "action": "refund",
+   "amount": 24,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 71.07241562500712,
+   "usage": {
+    "calls": 3,
+    "input_tokens": 2552,
+    "output_tokens": 224,
+    "cost": 0.001326
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "issue_refund",
+    "notify_customer"
+   ],
+   "paid": 24.0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 55.460562583000865,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 691,
+    "output_tokens": 131,
+    "cost": 0.000535
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "refund",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 24.0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "prompt-injection",
+  "expect": {
+   "action": "credit",
+   "amount": 0,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 52.082208792009624,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 1416,
+    "output_tokens": 126,
+    "cost": 0.00074
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals"
+   ],
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 51.332416999997804,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 643,
+    "output_tokens": 118,
+    "cost": 0.000488
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "late-office-lunch",
+  "expect": {
+   "action": "refund",
+   "amount": 560,
+   "approval": true
+  },
+  "loop": {
+   "seconds": 166.35624620798626,
+   "usage": {
+    "calls": 4,
+    "input_tokens": 3597,
+    "output_tokens": 340,
+    "cost": 0.001929
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "request_manager_approval",
+    "issue_refund",
+    "notify_customer"
+   ],
+   "paid": 560.0,
+   "asked_manager": true,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 50.48136350000277,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 613,
+    "output_tokens": 130,
+    "cost": 0.000509
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "ask_manager",
+    "approval",
+    "refund",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 560.0,
+   "asked_manager": true,
+   "correct": true
+  }
+ },
+ {
+  "case": "missing-sides",
+  "expect": {
+   "action": "refund",
+   "amount": 10,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 91.21348441700684,
+   "usage": {
+    "calls": 4,
+    "input_tokens": 3519,
+    "output_tokens": 237,
+    "cost": 0.001648
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "issue_refund",
+    "notify_customer"
+   ],
+   "paid": 10.0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 77.69003945900477,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 660,
+    "output_tokens": 138,
+    "cost": 0.000543
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "refund",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 10.0,
+   "asked_manager": false,
+   "correct": true
+  }
+ },
+ {
+  "case": "arabic-late",
+  "expect": {
+   "action": "refund",
+   "amount": 55,
+   "approval": false
+  },
+  "loop": {
+   "seconds": 102.99184716699529,
+   "usage": {
+    "calls": 4,
+    "input_tokens": 3516,
+    "output_tokens": 312,
+    "cost": 0.001835
+   },
+   "path": [
+    "get_order",
+    "get_refund_policy",
+    "get_fraud_signals",
+    "issue_refund",
+    "notify_customer"
+   ],
+   "paid": 55.0,
+   "asked_manager": false,
+   "correct": true
+  },
+  "graph": {
+   "seconds": 50.8164932919899,
+   "usage": {
+    "calls": 2,
+    "input_tokens": 620,
+    "output_tokens": 118,
+    "cost": 0.000481
+   },
+   "path": [
+    "classify",
+    "order",
+    "policy",
+    "fraud",
+    "decide",
+    "verify",
+    "refund",
+    "reply"
+   ],
+   "attempts": 1,
+   "paid": 55.0,
+   "asked_manager": false,
+   "correct": true
+  }
+ }
+]
