@@ -29,11 +29,12 @@ def preview(value, limit=400):
 
 
 class Tracer:
-    def __init__(self, stage, title, graph=None, usage=None, run_id=None, url=None):
+    def __init__(self, stage, title, graph=None, usage=None, run_id=None, url=None, t0=None):
+        """run_id and t0 let a resumed run, in another process, continue the same timeline."""
         self.run_id = run_id or uuid.uuid4().hex[:8]
         self.usage_of = usage                          # an llm.Usage to report alongside the state
         self.url = url or Platform().url
-        self.t0 = time.time()
+        self.t0 = t0 or time.time()
         self.q = queue.Queue()
         self.stage, self.title = stage, title
         threading.Thread(target=self._send_loop, daemon=True).start()
