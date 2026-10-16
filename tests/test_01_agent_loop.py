@@ -1,17 +1,12 @@
-import importlib.util
-import sys
-from pathlib import Path
-
 import httpx
 import pytest
 
 from agentkit.cases import REFUND
 from agentkit.platform import Platform
 from fakes import ScriptedChat
+from stages import load
 
-STAGE = Path(__file__).resolve().parents[1] / "01-agent-loop"
-sys.path.insert(0, str(STAGE))
-agent = importlib.import_module("agent")
+agent = load("01-agent-loop", "agent")
 
 LOOKUPS = [("get_order", {"order_id": "A-7731"}), ("get_refund_policy", {}),
            ("get_fraud_signals", {"customer": "C-1042"})]
