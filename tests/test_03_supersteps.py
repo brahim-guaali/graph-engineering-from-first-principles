@@ -1,3 +1,4 @@
+import inspect
 import time
 
 import httpx
@@ -10,7 +11,7 @@ from judges import answers
 from stages import load
 
 refund = load("03-supersteps", "refund")
-engine = load("03-supersteps", "engine")
+engine = inspect.getmodule(refund.StateGraph)    # the same module refund.py uses
 
 
 def test_lookups_run_in_parallel(platform):
